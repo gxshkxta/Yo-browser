@@ -4,48 +4,301 @@
     <meta charset="UTF-8">
     <title>Yo Browser</title>
     <style>
-        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
-        #url-bar { 
-            padding: 8px 12px; 
-            border: none; 
-            border-bottom: 1px solid #ccc; 
-            font-size: 14px; 
-            outline: none;
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; overflow: hidden; }
+        
+        /* Горната зона е отделен слой, който е НАД уеб изгледа */
+        #top-area { 
+            display: flex; 
+            flex-direction: column; 
+            background: #2a2a2a; 
+            z-index: 10; /* По-висок от main-content */
+            position: relative;
         }
-        #webview-container { flex: 1; display: flex; }
-        webview { flex: 1; }
+
+        /* Бутони за прозореца - вече са част от лентата с табове */
+        #window-controls {
+            display: flex;
+            height: 32px;
+            margin-left: auto; /* ТОВА ГИ ИЗБУТВА НАЙ-ВДЯСНО */
+            margin-bottom: 4px;
+            padding-right: 10px; /* Малко разстояние от ръба на екрана */
+            -webkit-app-region: no-drag;
+        }
+        .win-btn {
+            background: transparent;
+            border: none;
+            color: #ccc;
+            font-size: 14px;
+            width: 35px;
+            height: 100%;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+        .win-btn:hover { background: #444; color: #fff; }
+        .win-btn.close:hover { background: #e81123; color: #fff; }
+
+        /* Табове */
+        #tabs-container { 
+            display: flex; background: #1a1a1a; 
+            padding: 8px 10px 0 10px; gap: 4px; 
+            overflow-x: auto; scrollbar-width: none; 
+            height: 44px; align-items: flex-end; 
+            -webkit-app-region: drag; 
+        }
+        #tabs-container::-webkit-scrollbar { display: none; }
+        /* #tabs-container::after { content: ''; flex-grow: 1; height: 100%; -webkit-app-region: drag; } */
+        
+        .tab { 
+            display: flex; align-items: center; padding: 6px 12px; background: #2a2a2a; color: #888; 
+            cursor: pointer; font-size: 13px; max-width: 200px; min-width: 100px; gap: 10px; 
+            border-radius: 10px 10px 0 0; flex-shrink: 0; -webkit-app-region: no-drag; 
+        }
+        .tab:hover { background: #333; }
+        .tab.active { background: #2a2a2a; color: #fff; border-top: 2px solid #3a7bd5; }
+        .tab-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tab-close { color: #888; cursor: pointer; font-weight: bold; font-size: 16px; line-height: 1; }
+        .tab-close:hover { color: #ff4d4d; }
+
+        #new-tab-btn { 
+            background: transparent; border: none; color: #888; font-size: 20px; 
+            cursor: pointer; width: 32px; height: 32px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            margin-bottom: 4px; margin-left: 5px; flex-shrink: 0; -webkit-app-region: no-drag; 
+        }
+        #new-tab-btn:hover { background: #333; color: #fff; }
+        /* Хамбургер бутон в лентата с табове */
+        #menu-btn {
+            background: transparent;
+            border: none;
+            color: #ccc;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 10px;
+            margin-bottom: 4px; /* Подравнява го с табовете */
+            border-radius: 4px;
+            -webkit-app-region: no-drag;
+            display: flex;
+            align-items: center;
+            height: 32px;
+        }
+        #menu-btn:hover { background: #444; color: #fff; }
+        /* Инструменти */
+        #toolbar { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #111; gap: 8px; -webkit-app-region: no-drag; }
+        .nav-btn { background: transparent; border: none; color: #ccc; font-size: 16px; cursor: pointer; padding: 5px 10px; border-radius: 4px; }
+        .nav-btn:hover { background: #444; color: #fff; }
+        .nav-btn:disabled { color: #555; cursor: default; }
+        #url-bar { flex: 1; padding: 8px 15px; border: none; border-radius: 20px; background: #1a1a1a; color: #fff; font-size: 14px; outline: none; border: 1px solid #444; }
+        #url-bar:focus { border-color: #3a7bd5; }
+        
+        /* Долна зона - тук живее webview. Слагаме я на z-index: 1, за да е ПОД top-area */
+        #main-content { flex: 1; display: flex; position: relative; z-index: 1; }
+        #views-container { flex: 1; display: flex; position: relative; }
+                /* Странично меню (Хамбургер) */
+        #sidebar { 
+            width: 250px; background: #222; border-right: 1px solid #111; 
+            position: absolute; left: -250px; top: 0; bottom: 0; 
+            transition: left 0.3s ease; z-index: 100; padding: 20px; color: #fff; 
+            display: flex; flex-direction: column; gap: 15px; 
+            -webkit-app-region: no-drag;
+        }
+        #sidebar.open { left: 0; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        #sidebar h2 { 
+            margin: 0 0 10px 0; font-size: 24px; 
+            background: linear-gradient(45deg, #00d2ff, #3a7bd5); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+        }
+        #sidebar a { color: #aaa; text-decoration: none; font-size: 14px; }
+        #sidebar a:hover { color: #fff; }
+        webview { flex: 1; width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: none; }
+        webview.active { display: flex; }
     </style>
 </head>
 <body>
-    <input type="text" id="url-bar" placeholder="Въведете адрес или потърсете..." value="https://www.google.com">
-    <div id="webview-container">
-       <webview id="webview" src="https://gxshkxta.github.io/Yo-browser/index.html" allowpopups></webview>
+    <div id="top-area">
+        <div id="tabs-container">
+            <button class="nav-btn" id="menu-btn">☰</button>
+            <button id="new-tab-btn" title="Нов таб">+</button>
+            
+            <!-- Бутоните са преместени вътре в лентата с табове, за да са сигурно най-отгоре -->
+            <div id="window-controls">
+                <button class="win-btn" id="min-btn" title="Минимизиране">–</button>
+                <button class="win-btn" id="max-btn" title="Максимизиране / Възстановяване">□</button>
+                <button class="win-btn close" id="close-btn" title="Затваряне">×</button>
+            </div>
+        </div>
+        <div id="toolbar">
+            <button class="nav-btn" id="back-btn" disabled>←</button>
+            <button class="nav-btn" id="forward-btn" disabled>→</button>
+            <button class="nav-btn" id="reload-btn">↻</button>
+            <input type="text" id="url-bar" placeholder="Търсете или въведете адрес...">
+        </div>
+    </div>
+
+    <div id="main-content">
+        <!-- Странично меню -->
+        <div id="sidebar">
+            <h2>Yo</h2>
+            <a href="#" id="home-link">🏠 Начало</a>
+            <a href="#">⭐ Отметки (очаквайте скоро)</a>
+            <a href="#">⚙️ Настройки (очаквайте скоро)</a>
+            <a href="#">ℹ️ Относно Yo</a>
+        </div>
+
+        <div id="views-container"></div>
     </div>
 
     <script>
-        const urlBar = document.getElementById('url-bar');
-        const webview = document.getElementById('webview');
+        const { ipcRenderer } = require('electron');
 
-        urlBar.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                let url = urlBar.value.trim();
-                if (!/^https?:\/\//i.test(url)) {
-                    if (url.includes('.')) {
-                        url = 'https://' + url;
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlBar = document.getElementById('url-bar');
+            const tabsContainer = document.getElementById('tabs-container');
+            const viewsContainer = document.getElementById('views-container');
+            const newTabBtn = document.getElementById('new-tab-btn');
+            
+            let tabCounter = 0;
+
+            // Свързване на бутоните за прозореца
+            document.getElementById('min-btn').addEventListener('click', () => ipcRenderer.send('window-minimize'));
+            document.getElementById('max-btn').addEventListener('click', () => ipcRenderer.send('window-maximize'));
+            document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('window-close'));
+                        // Свързване на хамбургер менюто
+            const sidebar = document.getElementById('sidebar');
+            document.getElementById('menu-btn').addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+            });
+
+            // Линк "Начало" в менюто
+            document.getElementById('home-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                const activeView = getActiveView();
+                if (activeView) activeView.loadURL('index.html');
+                sidebar.classList.remove('open');
+            });
+
+            function createTab(url = 'index.html') {
+                tabCounter++;
+                const tabId = 'tab-' + tabCounter;
+
+                const tabEl = document.createElement('div');
+                tabEl.className = 'tab';
+                tabEl.id = tabId;
+                
+                const titleEl = document.createElement('span');
+                titleEl.className = 'tab-title';
+                titleEl.textContent = 'Зареждане...';
+                
+                const closeEl = document.createElement('span');
+                closeEl.className = 'tab-close';
+                closeEl.textContent = '×';
+                closeEl.onclick = (e) => { e.stopPropagation(); closeTab(tabId); };
+
+                tabEl.appendChild(titleEl);
+                tabEl.appendChild(closeEl);
+                tabEl.onclick = () => switchTab(tabId);
+                
+                // Вмъкваме таба преди бутона "+"
+                tabsContainer.insertBefore(tabEl, newTabBtn);
+
+                const viewEl = document.createElement('webview');
+                viewEl.id = 'view-' + tabId;
+                viewEl.src = url;
+                viewEl.setAttribute('allowpopups', '');
+                
+                viewEl.addEventListener('did-navigate', (e) => updateUrlBar(e.url));
+                viewEl.addEventListener('did-navigate-in-page', (e) => updateUrlBar(e.url));
+                viewEl.addEventListener('page-title-updated', (e) => { titleEl.textContent = e.title || 'Нов таб'; });
+
+                viewsContainer.appendChild(viewEl);
+                switchTab(tabId);
+            }
+
+            function switchTab(tabId) {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('webview').forEach(v => v.classList.remove('active'));
+
+                const selectedTab = document.getElementById(tabId);
+                const selectedView = document.getElementById('view-' + tabId);
+                
+                if (selectedTab && selectedView) {
+                    selectedTab.classList.add('active');
+                    selectedView.classList.add('active');
+                    
+                    try {
+                        if (selectedView.getURL()) {
+                            updateUrlBar(selectedView.getURL());
+                        }
+                    } catch (err) {}
+
+                    updateNavButtons(selectedView);
+                }
+            }
+
+            function closeTab(tabId) {
+                const tabEl = document.getElementById(tabId);
+                const viewEl = document.getElementById('view-' + tabId);
+                if (!tabEl || !viewEl) return;
+
+                const wasActive = tabEl.classList.contains('active');
+                tabEl.remove();
+                viewEl.remove();
+
+                if (wasActive) {
+                    const remainingTabs = document.querySelectorAll('.tab');
+                    if (remainingTabs.length > 0) {
+                        switchTab(remainingTabs[remainingTabs.length - 1].id);
                     } else {
-                        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+                        createTab();
                     }
                 }
-                webview.loadURL(url);
             }
-        });
 
-        webview.addEventListener('did-navigate', (e) => {
-            urlBar.value = e.url;
-        });
-        
-        webview.addEventListener('did-navigate-in-page', (e) => {
-            urlBar.value = e.url;
+            function updateUrlBar(url) {
+                if (!url) return;
+                urlBar.value = url.includes('index.html') ? '' : url;
+            }
+
+            function updateNavButtons(view) {
+                try {
+                    document.getElementById('back-btn').disabled = !view.canGoBack();
+                    document.getElementById('forward-btn').disabled = !view.canGoForward();
+                } catch (err) {}
+            }
+
+            function getActiveView() {
+                return document.querySelector('webview.active');
+            }
+
+            urlBar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const activeView = getActiveView();
+                    if (!activeView) return;
+                    let url = urlBar.value.trim();
+                    if (!/^https?:\/\//i.test(url)) {
+                        if (url.includes('.')) url = 'https://' + url;
+                        else url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+                    }
+                    activeView.loadURL(url);
+                }
+            });
+
+            document.getElementById('back-btn').addEventListener('click', () => {
+                const activeView = getActiveView();
+                if (activeView && activeView.canGoBack()) activeView.goBack();
+            });
+            document.getElementById('forward-btn').addEventListener('click', () => {
+                const activeView = getActiveView();
+                if (activeView && activeView.canGoForward()) activeView.goForward();
+            });
+            document.getElementById('reload-btn').addEventListener('click', () => {
+                const activeView = getActiveView();
+                if (activeView) activeView.reload();
+            });
+
+            newTabBtn.addEventListener('click', () => createTab());
+
+            createTab('index.html');
         });
     </script>
 </body>

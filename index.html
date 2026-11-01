@@ -8,17 +8,16 @@
         * { box-sizing: border-box; }
         body {
             margin: 0; padding: 0; height: 100vh;
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
+            display: flex; flex-direction: column; align-items: center;
             background-color: #1a1a1a; color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 15vh; user-select: none; -webkit-app-region: no-drag;
         }
+        .search-section { display: flex; flex-direction: column; align-items: center; width: 100%; }
         .logo {
-            font-size: 80px; font-weight: 900; letter-spacing: -4px;
-            margin-bottom: 40px;
+            font-size: 80px; font-weight: 900; letter-spacing: -4px; margin-bottom: 30px;
             background: linear-gradient(45deg, #00d2ff, #3a7bd5);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            user-select: none;
         }
         .search-container {
             width: 100%; max-width: 600px; display: flex;
@@ -26,38 +25,167 @@
             padding: 5px 20px; border: 1px solid #444;
             transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .search-container:focus-within {
-            border-color: #3a7bd5;
-            box-shadow: 0 0 15px rgba(58, 123, 213, 0.3);
+        .search-container:focus-within { border-color: #3a7bd5; box-shadow: 0 0 15px rgba(58, 123, 213, 0.3); }
+        .search-input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 18px; padding: 12px 0; }
+        .search-btn { background: transparent; border: none; color: #3a7bd5; font-size: 20px; cursor: pointer; padding: 0 10px; }
+
+        .quick-links-section { margin-top: 60px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 800px; }
+        .quick-link {
+            width: 70px; height: 70px; background: #2a2a2a; border-radius: 15px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; text-decoration: none; color: #ccc; font-size: 12px;
+            transition: background 0.2s, transform 0.2s; position: relative;
         }
-        .search-input {
-            flex: 1; background: transparent; border: none; outline: none;
-            color: #fff; font-size: 18px; padding: 12px 0;
+        .quick-link:hover { background: #3a3a3a; transform: translateY(-3px); }
+        .quick-link .delete-btn {
+            position: absolute; top: -5px; right: -5px; background: #e81123; color: white;
+            border-radius: 50%; width: 20px; height: 20px; display: none;
+            align-items: center; justify-content: center; font-size: 12px; font-weight: bold;
         }
-        .search-input::placeholder { color: #888; }
-        .search-btn {
-            background: transparent; border: none; color: #3a7bd5;
-            font-size: 20px; cursor: pointer; padding: 0 10px;
-        }
-        .search-btn:hover { color: #00d2ff; }
+        .quick-link:hover .delete-btn { display: flex; }
+        .add-btn { background: transparent; border: 2px dashed #444; color: #666; font-size: 30px; display: flex; align-items: center; justify-content: center; }
+        .add-btn:hover { border-color: #3a7bd5; color: #3a7bd5; background: #2a2a2a; }
     </style>
 </head>
 <body>
-    <div class="logo">Yo</div>
-    <div class="search-container">
-        <input type="text" class="search-input" id="searchInput" placeholder="Търсете в мрежата..." autofocus>
-        <button class="search-btn" onclick="doSearch()">🔍</button>
+    <div class="search-section">
+        <div class="logo">Yo</div>
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="Търсете в мрежата..." autofocus>
+            <button class="search-btn" onclick="doSearch()">🔍</button>
+        </div>
     </div>
+
+    <div class="quick-links-section" id="quick-links-container"></div>
+
     <script>
         function doSearch() {
             const query = document.getElementById('searchInput').value.trim();
-            if (query) {
-                window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
-            }
+            if (query) window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(query);
         }
         document.getElementById('searchInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') doSearch();
         });
+
+        // Defensive load of quick links
+        let quickLinks = [];
+        try {
+            const raw = localStorage.getItem('yo_links');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) quickLinks = parsed;
+            }
+        } catch (e) {
+            console.warn('Malformed yo_links in localStorage, resetting.', e);
+            quickLinks = [];
+        }
+
+        // In-page modal replacement for prompt() / confirm()
+        function showModal(message, defaultValue = null, isConfirm = false) {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText =
+                    'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+                const box = document.createElement('div');
+                box.style.cssText =
+                    'background:#2a2a2a;color:#fff;padding:20px;border-radius:12px;min-width:320px;max-width:480px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-family:inherit;';
+
+                const msg = document.createElement('div');
+                msg.textContent = message;
+                msg.style.cssText = 'margin-bottom:12px;font-size:15px;';
+                box.appendChild(msg);
+
+                let input = null;
+                if (!isConfirm) {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = defaultValue || '';
+                    input.style.cssText =
+                        'width:100%;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;outline:none;';
+                    box.appendChild(input);
+                }
+
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:16px;';
+
+                const cancel = document.createElement('button');
+                cancel.textContent = 'Отказ';
+                cancel.style.cssText =
+                    'background:transparent;border:1px solid #555;color:#ccc;padding:6px 14px;border-radius:8px;cursor:pointer;';
+
+                const ok = document.createElement('button');
+                ok.textContent = 'OK';
+                ok.style.cssText =
+                    'background:#3a7bd5;border:none;color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;';
+
+                row.appendChild(cancel);
+                row.appendChild(ok);
+                box.appendChild(row);
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+                if (input) setTimeout(() => input.focus(), 0);
+
+                ok.onclick = () => {
+                    overlay.remove();
+                    resolve(isConfirm ? true : (input ? (input.value.trim() || null) : null));
+                };
+                cancel.onclick = () => {
+                    overlay.remove();
+                    resolve(isConfirm ? false : null);
+                };
+            });
+        }
+
+        function renderLinks() {
+            const container = document.getElementById('quick-links-container');
+            container.innerHTML = '';
+
+            quickLinks.forEach((link, index) => {
+                const a = document.createElement('a');
+                a.className = 'quick-link';
+                a.href = link.url;
+                a.innerHTML = `
+                    <div style="font-size: 24px; font-weight: bold; color: #3a7bd5;">${link.name.charAt(0).toUpperCase()}</div>
+                    <div>${link.name}</div>
+                    <div class="delete-btn" onclick="deleteLink(event, ${index})">×</div>
+                `;
+                container.appendChild(a);
+            });
+
+            const addBtn = document.createElement('div');
+            addBtn.className = 'quick-link add-btn';
+            addBtn.innerHTML = '+';
+            addBtn.onclick = addNewLink;
+            container.appendChild(addBtn);
+        }
+
+        async function addNewLink() {
+            const url = await showModal('Въведете адрес (напр. https://youtube.com):');
+            if (!url) return;
+
+            const name = await showModal('Въведете име (напр. YouTube):');
+            if (!name) return;
+
+            let finalUrl = url;
+            if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
+
+            quickLinks.push({ name, url: finalUrl });
+            localStorage.setItem('yo_links', JSON.stringify(quickLinks));
+            renderLinks();
+        }
+
+        async function deleteLink(event, index) {
+            event.preventDefault();
+            const confirmed = await showModal('Изтриване на този линк?', null, true);
+            if (confirmed) {
+                quickLinks.splice(index, 1);
+                localStorage.setItem('yo_links', JSON.stringify(quickLinks));
+                renderLinks();
+            }
+        }
+
+        renderLinks();
     </script>
 </body>
 </html>
