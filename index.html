@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Yo Browser</title>
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
+        #url-bar { 
+            padding: 8px 12px; 
+            border: none; 
+            border-bottom: 1px solid #ccc; 
+            font-size: 14px; 
+            outline: none;
+        }
+        #webview-container { flex: 1; display: flex; }
+        webview { flex: 1; }
+    </style>
+</head>
+<body>
+    <input type="text" id="url-bar" placeholder="Въведете адрес или потърсете..." value="https://www.google.com">
+    <div id="webview-container">
+       <webview id="webview" src="https://gxshkxta.github.io/Yo-browser/home.html" allowpopups></webview>
+    </div>
+
+    <script>
+        const urlBar = document.getElementById('url-bar');
+        const webview = document.getElementById('webview');
+
+        urlBar.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                let url = urlBar.value.trim();
+                if (!/^https?:\/\//i.test(url)) {
+                    if (url.includes('.')) {
+                        url = 'https://' + url;
+                    } else {
+                        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+                    }
+                }
+                webview.loadURL(url);
+            }
+        });
+
+        webview.addEventListener('did-navigate', (e) => {
+            urlBar.value = e.url;
+        });
+        
+        webview.addEventListener('did-navigate-in-page', (e) => {
+            urlBar.value = e.url;
+        });
+    </script>
+</body>
+</html>
